@@ -27,6 +27,9 @@ pip install -r requirements.txt pyinstaller
 echo "==> Downloading and staging EasyOCR models..."
 python scripts/download_models.py
 
+echo "==> Verifying solver logic..."
+python scripts/verify_core.py
+
 echo "==> Building .app (this may take several minutes)..."
 pyinstaller bundle/SparxSolverPro.spec --noconfirm --clean
 

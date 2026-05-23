@@ -82,52 +82,67 @@ class SparxProApp(ctk.CTk):
         self._poll_ui_queue()
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
-        self.after(300, self._maybe_show_macos_permissions)
+        self._permissions_dialog: Optional[tk.Toplevel] = None
+        # Draw main UI first; permissions after the window is on screen (avoids blank CTk on macOS).
+        self.after(800, self._maybe_show_macos_permissions)
 
     def _maybe_show_macos_permissions(self) -> None:
         if sys.platform != "darwin":
             return
 
+        self.update_idletasks()
         status = request_all()
         if status.all_granted:
             return
-        if self.cfg.macos_permissions_ack and not status.all_granted:
-            # Still missing after user dismissed — ask again with live status
-            pass
         self._show_macos_permissions_dialog(status)
 
     def _show_macos_permissions_dialog(self, status: PermissionStatus) -> None:
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Permissions Required")
-        dialog.geometry("520x420")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
+        if self._permissions_dialog is not None and self._permissions_dialog.winfo_exists():
+            return
 
-        ctk.CTkLabel(
+        dialog = tk.Toplevel(self)
+        self._permissions_dialog = dialog
+        dialog.title("Permissions Required")
+        dialog.geometry("540x440")
+        dialog.resizable(False, False)
+        dialog.configure(bg="#1e1e2e")
+        dialog.transient(self)
+        # Do not use grab_set() — it can blank CustomTkinter windows on macOS.
+
+        tk.Label(
             dialog,
             text="Sparx Solver Pro needs macOS permissions",
-            font=ctk.CTkFont(size=16, weight="bold"),
-        ).pack(pady=(16, 8))
+            font=("Helvetica", 15, "bold"),
+            fg="#ffffff",
+            bg="#1e1e2e",
+        ).pack(pady=(18, 8))
 
-        ctk.CTkLabel(
+        tk.Label(
             dialog,
             text=(
-                "macOS should show popups — click Allow / Open Settings.\n"
-                "Enable both toggles for Sparx Solver Pro, then quit (Cmd+Q) and reopen."
+                "macOS may show popups — choose Allow or Open Settings.\n"
+                "Turn ON both toggles for Sparx Solver Pro, then quit (Cmd+Q) and reopen."
             ),
-            font=ctk.CTkFont(size=12),
-            text_color="gray",
-            wraplength=460,
-        ).pack(padx=20, pady=(0, 12))
-
-        status_frame = ctk.CTkFrame(dialog, corner_radius=8)
-        status_frame.pack(fill="x", padx=20, pady=8)
+            font=("Helvetica", 12),
+            fg="#a8a8b8",
+            bg="#1e1e2e",
+            justify="left",
+            wraplength=480,
+        ).pack(padx=22, pady=(0, 14))
 
         screen_var = tk.StringVar()
         access_var = tk.StringVar()
 
-        def _refresh_labels(st: PermissionStatus) -> PermissionStatus:
+        screen_label = tk.Label(
+            dialog, textvariable=screen_var, anchor="w", font=("Helvetica", 13), bg="#1e1e2e"
+        )
+        screen_label.pack(fill="x", padx=22, pady=4)
+        access_label = tk.Label(
+            dialog, textvariable=access_var, anchor="w", font=("Helvetica", 13), bg="#1e1e2e"
+        )
+        access_label.pack(fill="x", padx=22, pady=(0, 12))
+
+        def _refresh_labels(st: PermissionStatus) -> None:
             screen_var.set(
                 "Screen Recording: granted"
                 if st.screen_recording
@@ -138,30 +153,13 @@ class SparxProApp(ctk.CTk):
                 if st.accessibility
                 else "Accessibility: not granted yet"
             )
-            screen_label.configure(
-                text_color="#4ade80" if st.screen_recording else "#f87171"
-            )
-            access_label.configure(
-                text_color="#4ade80" if st.accessibility else "#f87171"
-            )
-            return st
-
-        screen_label = ctk.CTkLabel(
-            status_frame, textvariable=screen_var, anchor="w", font=ctk.CTkFont(size=13)
-        )
-        screen_label.pack(fill="x", padx=12, pady=(10, 4))
-        access_label = ctk.CTkLabel(
-            status_frame, textvariable=access_var, anchor="w", font=ctk.CTkFont(size=13)
-        )
-        access_label.pack(fill="x", padx=12, pady=(0, 10))
+            screen_label.configure(fg="#4ade80" if st.screen_recording else "#f87171")
+            access_label.configure(fg="#4ade80" if st.accessibility else "#f87171")
 
         _refresh_labels(status)
 
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=8)
-
         def _request_again() -> None:
-            st = request_all()
+            request_all()
             st = get_status()
             _refresh_labels(st)
             if st.all_granted:
@@ -171,38 +169,41 @@ class SparxProApp(ctk.CTk):
                     parent=dialog,
                 )
 
-        ctk.CTkButton(
-            btn_row,
-            text="Request permissions again",
-            command=_request_again,
-        ).pack(fill="x", pady=4)
-
-        ctk.CTkButton(
-            btn_row,
+        btn_opts = {"font": ("Helvetica", 12), "bg": "#3d3d5c", "fg": "#ffffff", "pady": 6}
+        tk.Button(
+            dialog, text="Request permissions again", command=_request_again, **btn_opts
+        ).pack(fill="x", padx=22, pady=3)
+        tk.Button(
+            dialog,
             text="Open Screen Recording settings",
             command=open_screen_recording_settings,
-        ).pack(fill="x", pady=4)
-
-        ctk.CTkButton(
-            btn_row,
+            **btn_opts,
+        ).pack(fill="x", padx=22, pady=3)
+        tk.Button(
+            dialog,
             text="Open Accessibility settings",
             command=open_accessibility_settings,
-        ).pack(fill="x", pady=4)
+            **btn_opts,
+        ).pack(fill="x", padx=22, pady=3)
 
         def _close_dialog() -> None:
             self.cfg.macos_permissions_ack = True
             self.cfg.save()
-            dialog.grab_release()
+            self._permissions_dialog = None
             dialog.destroy()
 
-        ctk.CTkButton(
+        tk.Button(
             dialog,
             text="Continue",
-            height=36,
-            fg_color="#2d8a4e",
-            hover_color="#236b3d",
             command=_close_dialog,
-        ).pack(fill="x", padx=20, pady=(12, 16))
+            font=("Helvetica", 13, "bold"),
+            bg="#2d8a4e",
+            fg="#ffffff",
+            pady=8,
+        ).pack(fill="x", padx=22, pady=(14, 18))
+
+        dialog.lift()
+        dialog.focus_force()
 
     def _ensure_macos_permissions_for_action(self) -> bool:
         if sys.platform != "darwin":
@@ -226,10 +227,14 @@ class SparxProApp(ctk.CTk):
 
     def _build_window(self) -> None:
         ctk.set_appearance_mode(self.cfg.theme)
-        ctk.set_default_color_theme(self.cfg.color_theme)
+        try:
+            ctk.set_default_color_theme(self.cfg.color_theme)
+        except Exception:
+            logger.warning("Theme %r unavailable, using default", self.cfg.color_theme)
         self.title("Sparx Solver Pro")
         self.geometry("980x680")
         self.minsize(820, 580)
+        self.update_idletasks()
 
     def _build_ui(self) -> None:
         self.tabview = ctk.CTkTabview(self, corner_radius=10)

@@ -114,6 +114,10 @@ Hotkeys: **Ctrl+Enter** Start · **Space** Pause/Resume · **Esc** Stop
 
 - Right-click **Sparx Solver Pro** → **Open** → **Open** again.
 
+### The app opens but windows are empty / solid grey
+
+The UI theme files were not loading inside the `.app`. Copy the latest project, rebuild with `bash scripts/build_mac.sh`, and replace the app in Applications. You should see buttons, tabs (Solver / History / Settings), and a normal permissions popup.
+
 ### The `.app` opens then closes instantly
 
 1. Copy the **updated** project from your PC to the Mac (the fix renames `packaging/` → `bundle/` to avoid a Python crash).

@@ -15,9 +15,10 @@ def _write_crash_log() -> None:
 
 
 def main() -> None:
-    from bundle.runtime_hook import configure_frozen_runtime
+    from bundle.runtime_hook import configure_customtkinter, configure_frozen_runtime
 
     configure_frozen_runtime()
+    configure_customtkinter()
 
     from ui.app import SparxProApp
 
