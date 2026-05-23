@@ -10,18 +10,21 @@ project_root = spec_dir.parent
 block_cipher = None
 
 # EasyOCR models staged by scripts/download_models.py
-models_src = project_root / "packaging" / "models" / "easyocr"
+models_src = project_root / "bundle" / "models" / "easyocr"
 datas = []
 if models_src.is_dir() and any(models_src.iterdir()):
     datas.append((str(models_src), "models/easyocr"))
 else:
     print(
-        "WARNING: No staged EasyOCR models at packaging/models/easyocr.\n"
+        "WARNING: No staged EasyOCR models at bundle/models/easyocr.\n"
         "         Run: python scripts/download_models.py"
     )
 
 hiddenimports = [
     "PIL._tkinter_finder",
+    "tkinter",
+    "tkinter.filedialog",
+    "tkinter.messagebox",
     "customtkinter",
     "easyocr",
     "torch",
@@ -29,12 +32,19 @@ hiddenimports = [
     "sympy",
     "pyautogui",
     "numpy",
-    "packaging.runtime_hook",
+    "bundle",
+    "bundle.runtime_hook",
+    "rubicon.objc",
+    "objc",
+    "Quartz",
+    "AppKit",
+    "Foundation",
+    "CoreFoundation",
 ]
 
-for pkg in ("customtkinter", "easyocr"):
+for pkg in ("customtkinter", "easyocr", "tkinter"):
     try:
-        pkg_datas, pkg_hidden, pkg_binaries = collect_all(pkg)
+        pkg_datas, pkg_hidden, _pkg_binaries = collect_all(pkg)
         datas += pkg_datas
         hiddenimports += pkg_hidden
     except Exception as exc:
@@ -53,7 +63,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(spec_dir / "pyi_rthook.py")],
     excludes=["matplotlib", "pandas", "scipy", "notebook", "jupyter"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

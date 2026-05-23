@@ -22,6 +22,13 @@ from core.automator import Automator, SessionCallbacks, State
 from core.capture import RegionSelector
 from utils.config import AppConfig
 from utils.history import HistoryManager, QuestionRecord, SessionRecord
+from utils.macos_permissions import (
+    PermissionStatus,
+    get_status,
+    open_accessibility_settings,
+    open_screen_recording_settings,
+    request_all,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,19 +85,140 @@ class SparxProApp(ctk.CTk):
         self.after(300, self._maybe_show_macos_permissions)
 
     def _maybe_show_macos_permissions(self) -> None:
-        if sys.platform != "darwin" or self.cfg.macos_permissions_ack:
+        if sys.platform != "darwin":
             return
-        mb.showinfo(
-            "macOS Permissions Required",
-            "Sparx Solver Pro needs macOS permissions to work:\n\n"
-            "1. Open System Settings → Privacy & Security\n"
-            "2. Turn ON Screen Recording for \"Sparx Solver Pro\"\n"
-            "3. Turn ON Accessibility for \"Sparx Solver Pro\"\n"
-            "4. Quit this app completely, then open it again\n\n"
-            "Without these, screen capture and typing will not work.",
+
+        status = request_all()
+        if status.all_granted:
+            return
+        if self.cfg.macos_permissions_ack and not status.all_granted:
+            # Still missing after user dismissed — ask again with live status
+            pass
+        self._show_macos_permissions_dialog(status)
+
+    def _show_macos_permissions_dialog(self, status: PermissionStatus) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Permissions Required")
+        dialog.geometry("520x420")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text="Sparx Solver Pro needs macOS permissions",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(pady=(16, 8))
+
+        ctk.CTkLabel(
+            dialog,
+            text=(
+                "macOS should show popups — click Allow / Open Settings.\n"
+                "Enable both toggles for Sparx Solver Pro, then quit (Cmd+Q) and reopen."
+            ),
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            wraplength=460,
+        ).pack(padx=20, pady=(0, 12))
+
+        status_frame = ctk.CTkFrame(dialog, corner_radius=8)
+        status_frame.pack(fill="x", padx=20, pady=8)
+
+        screen_var = tk.StringVar()
+        access_var = tk.StringVar()
+
+        def _refresh_labels(st: PermissionStatus) -> PermissionStatus:
+            screen_var.set(
+                "Screen Recording: granted"
+                if st.screen_recording
+                else "Screen Recording: not granted yet"
+            )
+            access_var.set(
+                "Accessibility: granted"
+                if st.accessibility
+                else "Accessibility: not granted yet"
+            )
+            screen_label.configure(
+                text_color="#4ade80" if st.screen_recording else "#f87171"
+            )
+            access_label.configure(
+                text_color="#4ade80" if st.accessibility else "#f87171"
+            )
+            return st
+
+        screen_label = ctk.CTkLabel(
+            status_frame, textvariable=screen_var, anchor="w", font=ctk.CTkFont(size=13)
         )
-        self.cfg.macos_permissions_ack = True
-        self.cfg.save()
+        screen_label.pack(fill="x", padx=12, pady=(10, 4))
+        access_label = ctk.CTkLabel(
+            status_frame, textvariable=access_var, anchor="w", font=ctk.CTkFont(size=13)
+        )
+        access_label.pack(fill="x", padx=12, pady=(0, 10))
+
+        _refresh_labels(status)
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=8)
+
+        def _request_again() -> None:
+            st = request_all()
+            st = get_status()
+            _refresh_labels(st)
+            if st.all_granted:
+                mb.showinfo(
+                    "Permissions OK",
+                    "All permissions granted. You can use the app now.",
+                    parent=dialog,
+                )
+
+        ctk.CTkButton(
+            btn_row,
+            text="Request permissions again",
+            command=_request_again,
+        ).pack(fill="x", pady=4)
+
+        ctk.CTkButton(
+            btn_row,
+            text="Open Screen Recording settings",
+            command=open_screen_recording_settings,
+        ).pack(fill="x", pady=4)
+
+        ctk.CTkButton(
+            btn_row,
+            text="Open Accessibility settings",
+            command=open_accessibility_settings,
+        ).pack(fill="x", pady=4)
+
+        def _close_dialog() -> None:
+            self.cfg.macos_permissions_ack = True
+            self.cfg.save()
+            dialog.grab_release()
+            dialog.destroy()
+
+        ctk.CTkButton(
+            dialog,
+            text="Continue",
+            height=36,
+            fg_color="#2d8a4e",
+            hover_color="#236b3d",
+            command=_close_dialog,
+        ).pack(fill="x", padx=20, pady=(12, 16))
+
+    def _ensure_macos_permissions_for_action(self) -> bool:
+        if sys.platform != "darwin":
+            return True
+        request_all()
+        status = get_status()
+        if status.all_granted:
+            return True
+        self._show_macos_permissions_dialog(status)
+        mb.showwarning(
+            "Permissions Required",
+            "Enable Screen Recording and Accessibility for Sparx Solver Pro, "
+            "then quit the app (Cmd+Q) and open it again.",
+            parent=self,
+        )
+        return False
 
     # ──────────────────────────────────────────────────────────────────────
     # Window & UI construction
@@ -432,6 +560,8 @@ class SparxProApp(ctk.CTk):
             self.start_btn.configure(state="normal")
 
     def _begin_region_selection(self) -> None:
+        if not self._ensure_macos_permissions_for_action():
+            return
         self.withdraw()
         self.after(150, self._do_region_selection)
 
@@ -459,6 +589,8 @@ class SparxProApp(ctk.CTk):
 
     def _start_session(self) -> None:
         if self.automator.state in (State.RUNNING, State.PAUSED):
+            return
+        if not self._ensure_macos_permissions_for_action():
             return
         if not self.cfg.region:
             mb.showwarning("No Region", "Please select a question region first.")

@@ -4,5 +4,5 @@ __pycache__/
 build/
 dist/
 *.spec.bak
-packaging/models/easyocr/
+bundle/models/easyocr/
 .DS_Store

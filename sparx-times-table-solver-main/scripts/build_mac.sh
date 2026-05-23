@@ -28,7 +28,7 @@ echo "==> Downloading and staging EasyOCR models..."
 python scripts/download_models.py
 
 echo "==> Building .app (this may take several minutes)..."
-pyinstaller packaging/SparxSolverPro.spec --noconfirm --clean
+pyinstaller bundle/SparxSolverPro.spec --noconfirm --clean
 
 APP_PATH="dist/Sparx Solver Pro.app"
 if [[ -d "$APP_PATH" ]]; then

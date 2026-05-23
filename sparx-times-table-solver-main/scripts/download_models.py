@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STAGE_DIR = PROJECT_ROOT / "packaging" / "models" / "easyocr"
+STAGE_DIR = PROJECT_ROOT / "bundle" / "models" / "easyocr"
 EASYOCR_MODEL_DIR = Path.home() / ".EasyOCR" / "model"
 
 

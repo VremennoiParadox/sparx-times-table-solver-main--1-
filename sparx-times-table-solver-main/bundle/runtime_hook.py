@@ -15,6 +15,8 @@ def configure_frozen_runtime() -> None:
     if models_dir.is_dir():
         os.environ.setdefault("EASYOCR_MODULE_PATH", str(models_dir))
 
+    os.environ.setdefault("TK_SILENCE_DEPRECATION", "1")
+
     if sys.platform == "darwin":
         log_dir = Path.home() / "Library" / "Logs" / "Sparx Solver Pro"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -26,4 +28,7 @@ def configure_frozen_runtime() -> None:
             force=True,
         )
         logger = logging.getLogger(__name__)
-        logger.info("Frozen runtime configured (models=%s)", models_dir if models_dir.is_dir() else "missing")
+        logger.info(
+            "Frozen runtime configured (models=%s)",
+            models_dir if models_dir.is_dir() else "missing",
+        )

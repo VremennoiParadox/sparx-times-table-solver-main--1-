@@ -22,11 +22,7 @@ Build the app **once** on your Mac, then run it like any other application from 
 
 1. Open **Sparx Solver Pro** from Applications (double-click).
 2. **First time only:** If macOS blocks the app, **right-click** it → **Open** → confirm. This is normal for unsigned personal apps.
-3. On first launch, follow the permissions popup:
-   - **System Settings → Privacy & Security**
-   - Turn on **Screen Recording** for **Sparx Solver Pro**
-   - Turn on **Accessibility** for **Sparx Solver Pro**
-   - **Quit the app fully** (Cmd+Q), then open it again.
+3. On first launch, the app **asks macOS for permissions** (Screen Recording and Accessibility popups). Use the in-app buttons if you need to open Settings manually. Turn both **on** for **Sparx Solver Pro**, then **quit (Cmd+Q) and reopen**.
 4. In the app: **Select Region** → drag around the question → set **Rounds** → **Start** → switch to your Sparx window.
 
 **First launch** may take 10–30 seconds while OCR loads inside the bundle. Later launches are faster.
@@ -112,8 +108,20 @@ Hotkeys: **Ctrl+Enter** Start · **Space** Pause/Resume · **Esc** Stop
 
 ### Screen capture is black or empty
 
-- On macOS: check **Screen Recording** is enabled for **Sparx Solver Pro**, then quit and reopen the app.
+- On macOS: open the app and use **Request permissions again** in the permissions window, or enable **Screen Recording** for **Sparx Solver Pro** in System Settings, then quit and reopen the app.
 
 ### Gatekeeper will not open the app
 
 - Right-click **Sparx Solver Pro** → **Open** → **Open** again.
+
+### The `.app` opens then closes instantly
+
+1. Copy the **updated** project from your PC to the Mac (the fix renames `packaging/` → `bundle/` to avoid a Python crash).
+2. Rebuild: `bash scripts/build_mac.sh`
+3. Replace the old app in Applications with the new one from `dist/`.
+4. If it still closes, open this file in TextEdit and send the last lines for help:
+   - `~/Library/Logs/Sparx Solver Pro/crash.log`
+5. Or run from Terminal to see the error live:
+   ```bash
+   "/Applications/Sparx Solver Pro.app/Contents/MacOS/Sparx Solver Pro"
+   ```
